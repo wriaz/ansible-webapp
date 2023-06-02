@@ -97,3 +97,13 @@
         name: httpd
         state: started
         enabled: yes
+    - name: Clone Git Repo
+      git: 
+        repo: "{{ repository }}"
+        dest: /var/www/html/
+        force: yes
+    - name: Copy index.php to proper path
+      copy: 
+        src: files/index.php
+        dest: /var/www/html/index.php
+        remote_src: no
