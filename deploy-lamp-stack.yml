@@ -1,0 +1,97 @@
+---
+- name: Install Utilities
+  hosts: all
+  become: yes
+  tasks: 
+    - name: Install basic utilities 
+      yum: 
+        name: 
+          - libselinux-python
+          - libsemanage-python
+          - firewalld
+        state: installed
+
+- name: Setup MySQL
+  hosts: lamp-db
+  become: yes
+  tasks: 
+    - name: Install MySQL 
+      yum: 
+        name: 
+          - mariadb-server
+          - MySQL-python
+        state: installed 
+    - name: Copy my.cnf file
+      copy: 
+        src: files/my.cnf
+        dest: /etc/my.cnf
+        remote_src: no
+    - name: Start and Enable MySQL  
+      service: 
+        name: mariadb
+        state: started
+        enabled: yes
+    - name: Start and Enable Firewalld  
+      service: 
+        name: firewalld
+        state: started
+        enabled: yes
+  
+    - name: Add Firewalld rule
+      firewalld: 
+        port: "{{ mysql_port }}/tcp"
+        state: enabled
+        permanent: yes
+        immediate: yes
+        zone: public
+    - name: Add Application DB
+      mysql_db: 
+        name: "{{ dbname }}"
+        state: present
+    - name: Add DB User
+      mysql_user: 
+        name: "{{ dbuser }}"
+        password:  "{{ dbpassword }}"
+        priv: "*.*:ALL"
+        host: 172.20.1.100
+    - name: Copy Db script
+      copy: 
+        src: files/db-load-script.sql
+        dest: /tmp
+        remote_src: no
+    - name: Load DB Data
+      shell: "mysql -f < /tmp/db-load-script.sql"
+
+
+
+- name: Setup Web Host
+  hosts: lampweb
+  become: yes
+  tasks: 
+    - name: Install Web server
+      yum: 
+        name: 
+          - httpd
+          - php
+          - php-mysql
+          - git
+        state: installed
+    - name: Start and Enable firewalld
+      service: 
+        name: firewalld
+        state: started
+    - name: Add firewalld Rule
+      firewalld:   
+        port: "{{ httpd_port }}/tcp"
+        state: enabled
+        permanent: yes
+        immediate: yes
+    - name: Set default page
+      replace: 
+        path: /etc/httpd/conf/httpd.conf
+        regexp: "DirectoryIndex index.html"
+        replace: "DirectoryIndex index.php"
+    - name: Start HTTPD service
+      service: 
+        name: httpd
+        state: started
